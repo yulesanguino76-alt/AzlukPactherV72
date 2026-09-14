@@ -69,24 +69,46 @@ class ApkEngine(private val ctx: Context) {
 
     // ── PUBLIC ────────────────────────────────────────────────────────────────
 
-    fun quickStatus(pkg: String): PatchStatus = try {
-        val ai = ctx.packageManager.getApplicationInfo(pkg, 0)
-        val apk = File(ai.sourceDir)
-        if (apk.length() > 150L * 1024 * 1024) return PatchStatus.LIKELY
-        val results = scanFile(apk)
-        if (results.isEmpty()) PatchStatus.UNKNOWN
-        else if (results.any { it.desc?.let { d ->
-            d.contains("SafetyNet") || d.contains("Frida") ||
-            d.contains("Xposed") || d.contains("Integrity") } == true })
-            PatchStatus.COMPLEX
-        else if (results.size > 2) PatchStatus.PATCHABLE
-        else PatchStatus.LIKELY
-    } catch (e: Exception) { PatchStatus.UNKNOWN }
+    fun quickStatus(pkg: String): PatchStatus {
+        return try {
+            val ai = ctx.packageManager.getApplicationInfo(pkg, 0)
+            val apk = File(ai.sourceDir)
+
+            if (apk.length() > 150L * 1024 * 1024) {
+                return PatchStatus.LIKELY
+            }
+
+            val results = scanFile(apk)
+
+            if (results.isEmpty()) {
+                PatchStatus.UNKNOWN
+            } else if (
+                results.any {
+                    it.desc?.let { d ->
+                        d.contains("SafetyNet") ||
+                        d.contains("Frida") ||
+                        d.contains("Xposed") ||
+                        d.contains("Integrity")
+                    } == true
+                }
+            ) {
+                PatchStatus.COMPLEX
+            } else if (results.size > 2) {
+                PatchStatus.PATCHABLE
+            } else {
+                PatchStatus.LIKELY
+            }
+        } catch (e: Exception) {
+            PatchStatus.UNKNOWN
+        }
+    }
 
     fun quickCount(pkg: String): Int = try {
         val ai = ctx.packageManager.getApplicationInfo(pkg, 0)
         scanFile(File(ai.sourceDir)).size
-    } catch (e: Exception) { 0 }
+    } catch (e: Exception) {
+        0
+    }
 
     @Throws(Exception::class)
     fun scan(pkg: String): List<ScanResult> {
@@ -96,7 +118,7 @@ class ApkEngine(private val ctx: Context) {
 
     @Throws(Exception::class)
     fun patch(pkg: String, patches: List<PatchType>, progress: Progress): File {
-        val ai  = ctx.packageManager.getApplicationInfo(pkg, 0)
+        val ai = ctx.packageManager.getApplicationInfo(pkg, 0)
         val out = File(StorageUtils.getPatchedDir(), "${pkg}_azluk.apk")
         patchToDisk(File(ai.sourceDir), out, patches, progress)
         return out
@@ -104,8 +126,14 @@ class ApkEngine(private val ctx: Context) {
 
     @Throws(Exception::class)
     fun patchExternal(input: File, patches: List<PatchType>, progress: Progress): File {
-        if (input.name.endsWith(".xapk")) return patchXapk(input, patches, progress)
-        val out = File(StorageUtils.getPatchedDir(), input.name.replace(".apk", "_azluk.apk"))
+        if (input.name.endsWith(".xapk")) {
+            return patchXapk(input, patches, progress)
+        }
+
+        val out = File(
+            StorageUtils.getPatchedDir(),
+            input.name.replace(".apk", "_azluk.apk")
+        )
         patchToDisk(input, out, patches, progress)
         return out
     }
@@ -113,73 +141,139 @@ class ApkEngine(private val ctx: Context) {
     // ── XAPK ─────────────────────────────────────────────────────────────────
 
     @Throws(Exception::class)
-    private fun patchXapk(xapk: File, patches: List<PatchType>, progress: Progress): File {
+    private fun patchXapk(
+        xapk: File,
+        patches: List<PatchType>,
+        progress: Progress
+    ): File {
         progress.on("Analyzing XAPK…")
+
         val tmp = File(ctx.cacheDir, "azluk_${System.currentTimeMillis()}")
         tmp.mkdirs()
+
         return try {
             val ex = LinkedHashMap<String, File>()
-            ZipInputStream(BufferedInputStream(FileInputStream(xapk), 65536)).use { z ->
+
+            ZipInputStream(
+                BufferedInputStream(FileInputStream(xapk), 65536)
+            ).use { z ->
                 var e = z.nextEntry
+
                 while (e != null) {
                     val d = File(tmp, e.name.replace("/", "__"))
-                    FileOutputStream(d).use { fo -> z.copyTo(fo) }
+
+                    FileOutputStream(d).use { fo ->
+                        z.copyTo(fo)
+                    }
+
                     ex[e.name] = d
                     e = z.nextEntry
                 }
             }
-            var main: File? = null; var mainKey: String? = null
-            for ((k, v) in ex) { if (k == "base.apk") { main = v; mainKey = k; break } }
-            if (main == null) for ((k, v) in ex) { if (k.endsWith(".apk")) { main = v; mainKey = k; break } }
+
+            var main: File? = null
+            var mainKey: String? = null
+
+            for ((k, v) in ex) {
+                if (k == "base.apk") {
+                    main = v
+                    mainKey = k
+                    break
+                }
+            }
+
+            if (main == null) {
+                for ((k, v) in ex) {
+                    if (k.endsWith(".apk")) {
+                        main = v
+                        mainKey = k
+                        break
+                    }
+                }
+            }
+
             requireNotNull(main) { "No APK in XAPK" }
 
             progress.on("Patching $mainKey…")
+
             val pb = File(tmp, "patched.apk")
             patchToDisk(main, pb, patches, progress)
             ex[mainKey!!] = pb
 
             val outName = xapk.name.replace(".xapk", "_azluk.xapk")
             val outXapk = File(StorageUtils.getPatchedDir(), outName)
-            ZipOutputStream(BufferedOutputStream(FileOutputStream(outXapk), 65536)).use { zo ->
+
+            ZipOutputStream(
+                BufferedOutputStream(FileOutputStream(outXapk), 65536)
+            ).use { zo ->
                 for ((k, v) in ex) {
-                    val ze = ZipEntry(k); ze.method = ZipEntry.DEFLATED
-                    zo.putNextEntry(ze); v.inputStream().use { it.copyTo(zo) }; zo.closeEntry()
+                    val ze = ZipEntry(k)
+                    ze.method = ZipEntry.DEFLATED
+
+                    zo.putNextEntry(ze)
+                    v.inputStream().use { it.copyTo(zo) }
+                    zo.closeEntry()
                 }
             }
+
             outXapk
-        } finally { tmp.deleteRecursively() }
+        } finally {
+            tmp.deleteRecursively()
+        }
     }
 
     // ── PATCH CORE ────────────────────────────────────────────────────────────
 
     @Throws(Exception::class)
-    private fun patchToDisk(input: File, out: File, patches: List<PatchType>, progress: Progress) {
+    private fun patchToDisk(
+        input: File,
+        out: File,
+        patches: List<PatchType>,
+        progress: Progress
+    ) {
         out.parentFile?.mkdirs()
+
         val tmp = File(out.parentFile, "${out.name}.tmp")
         progress.on("Reading ${input.name}…")
 
-        ZipInputStream(BufferedInputStream(FileInputStream(input), 65536)).use { zi ->
-            ZipOutputStream(BufferedOutputStream(FileOutputStream(tmp), 65536)).use { zo ->
+        ZipInputStream(
+            BufferedInputStream(FileInputStream(input), 65536)
+        ).use { zi ->
+            ZipOutputStream(
+                BufferedOutputStream(FileOutputStream(tmp), 65536)
+            ).use { zo ->
                 var e = zi.nextEntry
+
                 while (e != null) {
                     val name = e.name
                     val data = zi.readBytes()
+
                     val patched = if (name.endsWith(".dex") && isDex(data)) {
                         progress.on("Patching $name…")
                         patchDex(data, patches)
-                    } else data
+                    } else {
+                        data
+                    }
 
-                    val ze = ZipEntry(name); ze.method = ZipEntry.DEFLATED
-                    zo.putNextEntry(ze); zo.write(patched); zo.closeEntry()
+                    val ze = ZipEntry(name)
+                    ze.method = ZipEntry.DEFLATED
+
+                    zo.putNextEntry(ze)
+                    zo.write(patched)
+                    zo.closeEntry()
+
                     e = zi.nextEntry
                 }
             }
         }
 
         progress.on("Signing (v1+v2)…")
+
         val signed = ApkSignerV2.sign(tmp.readBytes())
         out.writeBytes(signed)
+
         tmp.delete()
+
         progress.on("Done → ${out.name}")
     }
 
@@ -188,163 +282,261 @@ class ApkEngine(private val ctx: Context) {
     private fun scanFile(apk: File): List<ScanResult> {
         val results = mutableListOf<ScanResult>()
         var dexIndex = 0
-        ZipInputStream(BufferedInputStream(FileInputStream(apk), 65536)).use { z ->
+
+        ZipInputStream(
+            BufferedInputStream(FileInputStream(apk), 65536)
+        ).use { z ->
             var e = z.nextEntry
+
             while (e != null) {
                 if (e.name.endsWith(".dex")) {
                     val data = z.readBytes()
-                    if (isDex(data)) results.addAll(scanDex(data, dexIndex++))
+
+                    if (isDex(data)) {
+                        results.addAll(scanDex(data, dexIndex++))
+                    }
                 }
+
                 e = z.nextEntry
             }
         }
+
         return results.distinctBy { it.patchType + it.desc }
     }
 
     private fun scanDex(dex: ByteArray, idx: Int): List<ScanResult> {
         val results = mutableListOf<ScanResult>()
         val buf = ByteBuffer.wrap(dex).order(ByteOrder.LITTLE_ENDIAN)
+
         try {
-            val stringIdsOff  = buf.getInt(0x38)
+            val stringIdsOff = buf.getInt(0x38)
             val stringIdsSize = buf.getInt(0x34)
+
             for (i in 0 until stringIdsSize) {
                 val strDataOff = buf.getInt(stringIdsOff + i * 4)
-                if (strDataOff <= 0 || strDataOff >= dex.size) continue
-                // ULEB128 length
-                var len = 0; var shift = 0; var pos = strDataOff
+
+                if (strDataOff <= 0 || strDataOff >= dex.size) {
+                    continue
+                }
+
+                var len = 0
+                var shift = 0
+                var pos = strDataOff
+
                 while (pos < dex.size) {
                     val b = dex[pos++].toInt() and 0xff
-                    len = len or ((b and 0x7f) shl shift); shift += 7
-                    if (b and 0x80 == 0) break
+
+                    len = len or ((b and 0x7f) shl shift)
+                    shift += 7
+
+                    if (b and 0x80 == 0) {
+                        break
+                    }
                 }
-                if (pos + len > dex.size || len <= 0) continue
+
+                if (pos + len > dex.size || len <= 0) {
+                    continue
+                }
+
                 val str = String(dex, pos, len, Charsets.UTF_8)
+
                 for (pat in PATTERNS) {
                     if (str.contains(pat[0], ignoreCase = true)) {
-                        results.add(ScanResult(pat[1], pat[2], idx, strDataOff))
+                        results.add(
+                            ScanResult(
+                                pat[1],
+                                pat[2],
+                                idx,
+                                strDataOff
+                            )
+                        )
                     }
                 }
             }
-        } catch (e: Exception) { Log.w(TAG, "scanDex idx=$idx: ${e.message}") }
+        } catch (e: Exception) {
+            Log.w(TAG, "scanDex idx=$idx: ${e.message}")
+        }
+
         return results
     }
 
     // ── DEX PATCH ────────────────────────────────────────────────────────────
 
-    private fun patchDex(dex: ByteArray, patches: List<PatchType>): ByteArray {
+    private fun patchDex(
+        dex: ByteArray,
+        patches: List<PatchType>
+    ): ByteArray {
         val patched = dex.copyOf()
         val buf = ByteBuffer.wrap(patched).order(ByteOrder.LITTLE_ENDIAN)
 
         val patchKeys = patches.map { it.key }.toSet()
 
-        // Scan strings to find which patterns match requested patches
         val targetTypes = mutableSetOf<String>()
+
         try {
-            val stringIdsOff  = buf.getInt(0x38)
+            val stringIdsOff = buf.getInt(0x38)
             val stringIdsSize = buf.getInt(0x34)
+
             for (i in 0 until stringIdsSize) {
                 val strDataOff = buf.getInt(stringIdsOff + i * 4)
-                if (strDataOff <= 0 || strDataOff >= patched.size) continue
-                var len = 0; var shift = 0; var pos = strDataOff
+
+                if (strDataOff <= 0 || strDataOff >= patched.size) {
+                    continue
+                }
+
+                var len = 0
+                var shift = 0
+                var pos = strDataOff
+
                 while (pos < patched.size) {
                     val b = patched[pos++].toInt() and 0xff
-                    len = len or ((b and 0x7f) shl shift); shift += 7
-                    if (b and 0x80 == 0) break
+
+                    len = len or ((b and 0x7f) shl shift)
+                    shift += 7
+
+                    if (b and 0x80 == 0) {
+                        break
+                    }
                 }
-                if (pos + len > patched.size || len <= 0) continue
+
+                if (pos + len > patched.size || len <= 0) {
+                    continue
+                }
+
                 val str = String(patched, pos, len, Charsets.UTF_8)
+
                 for (pat in PATTERNS) {
-                    if (str.contains(pat[0], ignoreCase = true) && pat[1] in patchKeys) {
+                    if (
+                        str.contains(pat[0], ignoreCase = true) &&
+                        pat[1] in patchKeys
+                    ) {
                         targetTypes.add(pat[0])
                     }
                 }
             }
-        } catch (e: Exception) { /* continue with empty targetTypes */ }
+        } catch (e: Exception) {
+            // Continue with empty targetTypes
+        }
 
-        // Patch method bodies
         try {
-            val classDefsOff  = buf.getInt(0x60)
+            val classDefsOff = buf.getInt(0x60)
             val classDefsSize = buf.getInt(0x5c)
+
             for (ci in 0 until classDefsSize) {
                 val classDefOff = classDefsOff + ci * 32
                 val classDataOff = buf.getInt(classDefOff + 24)
-                if (classDataOff == 0) continue
-                patchClassData(patched, classDataOff, patches, patchKeys, targetTypes)
-            }
-        } catch (e: Exception) { Log.w(TAG, "patchDex class walk: ${e.message}") }
 
-        // Recompute checksum (Adler-32 over bytes 12..)
+                if (classDataOff == 0) {
+                    continue
+                }
+
+                patchClassData(
+                    patched,
+                    classDataOff,
+                    patches,
+                    patchKeys,
+                    targetTypes
+                )
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "patchDex class walk: ${e.message}")
+        }
+
         val adler = java.util.zip.Adler32()
         adler.update(patched, 12, patched.size - 12)
+
         val cs = adler.value
-        patched[8]  = (cs and 0xff).toByte()
-        patched[9]  = ((cs shr 8) and 0xff).toByte()
+
+        patched[8] = (cs and 0xff).toByte()
+        patched[9] = ((cs shr 8) and 0xff).toByte()
         patched[10] = ((cs shr 16) and 0xff).toByte()
         patched[11] = ((cs shr 24) and 0xff).toByte()
 
-        // Recompute SHA-1 (bytes 32.., written at offset 12)
         val sha1 = MessageDigest.getInstance("SHA-1")
         sha1.update(patched, 32, patched.size - 32)
+
         val hash = sha1.digest()
+
         System.arraycopy(hash, 0, patched, 12, 20)
 
         return patched
     }
 
     private fun patchClassData(
-        dex: ByteArray, off: Int,
-        patches: List<PatchType>, patchKeys: Set<String>,
+        dex: ByteArray,
+        off: Int,
+        patches: List<PatchType>,
+        patchKeys: Set<String>,
         targetTypes: Set<String>
     ) {
         var pos = off
+
         fun readUleb(): Int {
-            var v = 0; var s = 0
+            var v = 0
+            var s = 0
+
             while (pos < dex.size) {
                 val b = dex[pos++].toInt() and 0xff
-                v = v or ((b and 0x7f) shl s); s += 7
-                if (b and 0x80 == 0) break
+
+                v = v or ((b and 0x7f) shl s)
+                s += 7
+
+                if (b and 0x80 == 0) {
+                    break
+                }
             }
+
             return v
         }
-        val staticFieldsSize  = readUleb()
+
+        val staticFieldsSize = readUleb()
         val instanceFieldSize = readUleb()
-        val directMethodSize  = readUleb()
+        val directMethodSize = readUleb()
         val virtualMethodSize = readUleb()
 
-        // skip fields
-        repeat(staticFieldsSize)  { readUleb(); readUleb() }
-        repeat(instanceFieldSize) { readUleb(); readUleb() }
+        repeat(staticFieldsSize) {
+            readUleb()
+            readUleb()
+        }
 
-        // patch methods
+        repeat(instanceFieldSize) {
+            readUleb()
+            readUleb()
+        }
+
         repeat(directMethodSize + virtualMethodSize) {
-            readUleb(); readUleb()   // method_idx_diff, access_flags
+            readUleb()
+            readUleb()
+
             val codeOff = readUleb()
+
             if (codeOff != 0 && codeOff + 16 < dex.size) {
-                // code_item: registers_size(u16), ins_size(u16), outs_size(u16),
-                //            tries_size(u16), debug_info_off(u32), insns_size(u32)
-                val insnsOff  = codeOff + 16
+                val insnsOff = codeOff + 16
+
                 if (insnsOff < dex.size) {
-                    // Patch first instruction based on active patch types
-                    if (PatchType.LICENSE_BYPASS in patches || PatchType.IAP_BYPASS in patches ||
-                        PatchType.SIGNATURE_BYPASS in patches || PatchType.REMOVE_ADS in patches ||
-                        PatchType.SSL_BYPASS in patches) {
+                    if (
+                        PatchType.LICENSE_BYPASS in patches ||
+                        PatchType.IAP_BYPASS in patches ||
+                        PatchType.SIGNATURE_BYPASS in patches ||
+                        PatchType.REMOVE_ADS in patches ||
+                        PatchType.SSL_BYPASS in patches
+                    ) {
                         if (targetTypes.isNotEmpty()) {
-                            // Collapse to ret-void — works for void methods
                             dex[insnsOff] = RET_VOID
                         }
                     }
+
                     if (PatchType.ROOT_BYPASS in patches) {
-                        // isRooted() → return false: const/4 v0, 0x0
                         if (insnsOff + 2 < dex.size) {
-                            dex[insnsOff]   = CONST4
-                            dex[insnsOff+1] = 0x00
+                            dex[insnsOff] = CONST4
+                            dex[insnsOff + 1] = 0x00
                         }
                     }
+
                     if (PatchType.FORCE_DEBUGGABLE in patches) {
-                        // isDebuggerConnected() → return true: const/4 v0, 0x1
                         if (insnsOff + 2 < dex.size) {
-                            dex[insnsOff]   = CONST4
-                            dex[insnsOff+1] = 0x01
+                            dex[insnsOff] = CONST4
+                            dex[insnsOff + 1] = 0x01
                         }
                     }
                 }
@@ -353,30 +545,39 @@ class ApkEngine(private val ctx: Context) {
     }
 
     private fun isDex(data: ByteArray): Boolean =
-        data.size > 4 && data[0] == DEX_MAGIC[0] && data[1] == DEX_MAGIC[1] &&
-        data[2] == DEX_MAGIC[2] && data[3] == DEX_MAGIC[3]
+        data.size > 4 &&
+        data[0] == DEX_MAGIC[0] &&
+        data[1] == DEX_MAGIC[1] &&
+        data[2] == DEX_MAGIC[2] &&
+        data[3] == DEX_MAGIC[3]
 
     // ── MANIFEST debug flag ───────────────────────────────────────────────────
 
     @Suppress("UNUSED")
     private fun patchManifest(xml: ByteArray): ByteArray {
-        // Binary XML: find debuggable attribute (0x0101021b) and set to 0xffffffff
         val patched = xml.copyOf()
         val target = byteArrayOf(0x1b, 0x02, 0x01, 0x01)
+
         var i = 0
+
         while (i < patched.size - 4) {
-            if (patched[i]   == target[0] && patched[i+1] == target[1] &&
-                patched[i+2] == target[2] && patched[i+3] == target[3]) {
-                // value is 8 bytes ahead (ResValue.data)
+            if (
+                patched[i] == target[0] &&
+                patched[i + 1] == target[1] &&
+                patched[i + 2] == target[2] &&
+                patched[i + 3] == target[3]
+            ) {
                 if (i + 12 < patched.size) {
-                    patched[i+8]  = 0xff.toByte()
-                    patched[i+9]  = 0xff.toByte()
-                    patched[i+10] = 0xff.toByte()
-                    patched[i+11] = 0xff.toByte()
+                    patched[i + 8] = 0xff.toByte()
+                    patched[i + 9] = 0xff.toByte()
+                    patched[i + 10] = 0xff.toByte()
+                    patched[i + 11] = 0xff.toByte()
                 }
             }
+
             i++
         }
+
         return patched
     }
 }
