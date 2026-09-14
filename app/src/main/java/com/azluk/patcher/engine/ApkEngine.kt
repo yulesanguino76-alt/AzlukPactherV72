@@ -18,11 +18,6 @@ import java.util.zip.*
  * Same 10 patch types as V6 but now fully Kotlin with coroutine-friendly
  * suspend interface exposed at ViewModel level (engine itself is synchronous,
  * ViewModel wraps in Dispatchers.IO).
- *
- * DEX layout mental model:
- *   [magic 8B][checksum 4B][SHA-1 20B][header 104B total][string_ids][type_ids]
- *   [proto_ids][field_ids][method_ids][class_defs][data...]
- *
  * We scan the string pool for marker patterns, then patch the bytecode in
  * the method bodies that reference those strings — specifically:
  *   RET_VOID (0x0e) replaces the first instruction of methods that gate
