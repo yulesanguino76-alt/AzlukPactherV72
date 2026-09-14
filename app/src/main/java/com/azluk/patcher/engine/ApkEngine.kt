@@ -61,7 +61,7 @@ class ApkEngine(private val ctx: Context) {
             arrayOf("SafetyNet",                   "NONE",             "SafetyNet anti-tamper"),
             arrayOf("com/google/android/play/core/integrity","NONE",   "Play Integrity API"),
             arrayOf("frida",                       "NONE",             "Frida detection"),
-            arrayOf("XposedBridge",                "NONE",             "Xposed detection"),
+            arrayOf("XposedBridge",                "NONE",             "Xposed detection")
         )
     }
 
