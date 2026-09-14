@@ -4,7 +4,6 @@ import android.content.Context
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.os.Build
-import com.azluk.patcher.model.AppInfo
 import java.io.File
 
 class AppScanner(
@@ -58,10 +57,6 @@ class AppScanner(
                     packageName
                 }
 
-                /*
-                 * El icono se obtiene individualmente y cualquier error
-                 * queda aislado de las demás aplicaciones.
-                 */
                 val icon = try {
                     pm.getApplicationIcon(packageName)
                 } catch (_: Exception) {
@@ -72,7 +67,7 @@ class AppScanner(
 
                 val apkSizeMb = try {
                     File(apkPath).length() /
-                            (1024f * 1024f)
+                        (1024f * 1024f)
                 } catch (_: Exception) {
                     0f
                 }
@@ -90,10 +85,7 @@ class AppScanner(
                     )
                 )
             } catch (_: Exception) {
-                /*
-                 * Una aplicación dañada, desinstalada durante el escaneo
-                 * o incompatible no debe cerrar AzlukPatcher.
-                 */
+                // Una aplicación problemática no debe cerrar AzlukPatcher.
             }
         }
 
