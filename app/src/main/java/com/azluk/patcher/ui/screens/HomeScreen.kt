@@ -17,6 +17,7 @@ import androidx.compose.ui.draw.*
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -34,7 +35,10 @@ import com.google.accompanist.drawablepainter.DrawablePainter
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeScreen(navController: NavController, vm: MainViewModel = viewModel()) {
+fun HomeScreen(
+    navController: NavController,
+    vm: MainViewModel = viewModel()
+) {
     val state by vm.state.collectAsStateWithLifecycle()
 
     LaunchedEffect(Unit) {
@@ -52,23 +56,32 @@ fun HomeScreen(navController: NavController, vm: MainViewModel = viewModel()) {
                             listOf(AzlukSurface2, AzlukBg)
                         )
                     )
-                    .padding(horizontal = 16.dp, vertical = 12.dp)
+                    .padding(
+                        horizontal = 16.dp,
+                        vertical = 12.dp
+                    )
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         Image(
                             painter = painterResource(R.mipmap.ic_launcher),
                             contentDescription = "AzlukPatcher",
                             modifier = Modifier
                                 .size(40.dp)
-                                .clip(RoundedCornerShape(10.dp))
+                                .clip(
+                                    RoundedCornerShape(10.dp)
+                                )
                         )
 
-                        Spacer(Modifier.width(10.dp))
+                        Spacer(
+                            Modifier.width(10.dp)
+                        )
 
                         Column {
                             Text(
@@ -126,7 +139,9 @@ fun HomeScreen(navController: NavController, vm: MainViewModel = viewModel()) {
                     }
                 }
 
-                Spacer(Modifier.height(10.dp))
+                Spacer(
+                    Modifier.height(10.dp)
+                )
 
                 OutlinedTextField(
                     value = state.query,
@@ -135,7 +150,9 @@ fun HomeScreen(navController: NavController, vm: MainViewModel = viewModel()) {
                     placeholder = {
                         Text(
                             "Search apps…",
-                            color = AzlukOnSurface.copy(alpha = .5f)
+                            color = AzlukOnSurface.copy(
+                                alpha = .5f
+                            )
                         )
                     },
                     leadingIcon = {
@@ -156,12 +173,19 @@ fun HomeScreen(navController: NavController, vm: MainViewModel = viewModel()) {
                     shape = RoundedCornerShape(12.dp)
                 )
 
-                Spacer(Modifier.height(8.dp))
+                Spacer(
+                    Modifier.height(8.dp)
+                )
 
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    listOf("User", "System", "All").forEachIndexed { i, label ->
+                    listOf(
+                        "User",
+                        "System",
+                        "All"
+                    ).forEachIndexed { i, label ->
+
                         FilterChip(
                             selected = state.filter == i,
                             onClick = {
@@ -182,40 +206,56 @@ fun HomeScreen(navController: NavController, vm: MainViewModel = viewModel()) {
                         )
                     }
 
-                    Spacer(Modifier.weight(1f))
+                    Spacer(
+                        Modifier.weight(1f)
+                    )
 
                     Text(
                         "${state.filteredApps.size} apps",
                         color = AzlukOnSurface,
                         fontSize = 12.sp,
-                        modifier = Modifier.align(Alignment.CenterVertically)
+                        modifier = Modifier.align(
+                            Alignment.CenterVertically
+                        )
                     )
                 }
             }
         }
     ) { padding ->
+
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
         ) {
+
             if (state.isLoading) {
+
                 CircularProgressIndicator(
-                    modifier = Modifier.align(Alignment.Center),
+                    modifier = Modifier.align(
+                        Alignment.Center
+                    ),
                     color = AzlukBlue
                 )
+
             } else {
+
                 LazyColumn(
                     contentPadding = PaddingValues(
                         horizontal = 12.dp,
                         vertical = 8.dp
                     ),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                    verticalArrangement = Arrangement.spacedBy(
+                        6.dp
+                    )
                 ) {
                     items(
                         state.filteredApps,
-                        key = { it.packageName }
+                        key = {
+                            it.packageName
+                        }
                     ) { app ->
+
                         AppCard(
                             app = app,
                             onClick = {
@@ -232,7 +272,9 @@ fun HomeScreen(navController: NavController, vm: MainViewModel = viewModel()) {
                 LinearProgressIndicator(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .align(Alignment.BottomCenter),
+                        .align(
+                            Alignment.BottomCenter
+                        ),
                     color = AzlukBlue,
                     trackColor = AzlukSurface
                 )
@@ -249,7 +291,9 @@ fun AppCard(
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick),
+            .clickable(
+                onClick = onClick
+            ),
         color = AzlukSurface,
         shape = RoundedCornerShape(12.dp),
         tonalElevation = 0.dp
@@ -258,20 +302,31 @@ fun AppCard(
             modifier = Modifier.padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+
             Box(
                 modifier = Modifier
                     .size(48.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(AzlukSurface2),
+                    .clip(
+                        RoundedCornerShape(10.dp)
+                    )
+                    .background(
+                        AzlukSurface2
+                    ),
                 contentAlignment = Alignment.Center
             ) {
+
                 if (app.icon != null) {
+
                     Image(
-                        painter = rememberDrawablePainter(app.icon),
+                        painter = rememberDrawablePainter(
+                            app.icon
+                        ),
                         contentDescription = app.appName,
                         modifier = Modifier.size(44.dp)
                     )
+
                 } else {
+
                     Icon(
                         Icons.Default.Android,
                         null,
@@ -281,11 +336,14 @@ fun AppCard(
                 }
             }
 
-            Spacer(Modifier.width(12.dp))
+            Spacer(
+                Modifier.width(12.dp)
+            )
 
             Column(
                 Modifier.weight(1f)
             ) {
+
                 Text(
                     app.appName,
                     color = AzlukOnBg,
@@ -303,24 +361,32 @@ fun AppCard(
                     overflow = TextOverflow.Ellipsis
                 )
 
-                Spacer(Modifier.height(4.dp))
+                Spacer(
+                    Modifier.height(4.dp)
+                )
 
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    horizontalArrangement = Arrangement.spacedBy(
+                        6.dp
+                    )
                 ) {
+
                     StatusChip(
                         app.patchStatus,
                         app.opportunityCount
                     )
 
                     if (app.isSystemApp) {
+
                         Text(
                             "SYS",
                             color = AzlukWarning,
                             fontSize = 10.sp,
                             modifier = Modifier
                                 .background(
-                                    AzlukWarning.copy(alpha = .1f),
+                                    AzlukWarning.copy(
+                                        alpha = .1f
+                                    ),
                                     RoundedCornerShape(4.dp)
                                 )
                                 .padding(
@@ -335,7 +401,9 @@ fun AppCard(
             Icon(
                 Icons.Default.ChevronRight,
                 null,
-                tint = AzlukOnSurface.copy(alpha = .4f)
+                tint = AzlukOnSurface.copy(
+                    alpha = .4f
+                )
             )
         }
     }
@@ -347,6 +415,7 @@ fun StatusChip(
     count: Int
 ) {
     val (color, label) = when (status) {
+
         PatchStatus.PATCHABLE ->
             AzlukSuccess to "Patchable ($count)"
 
@@ -357,7 +426,9 @@ fun StatusChip(
             AzlukWarning to "Complex"
 
         PatchStatus.UNKNOWN ->
-            AzlukOnSurface.copy(alpha = .4f) to "Scanning…"
+            AzlukOnSurface.copy(
+                alpha = .4f
+            ) to "Scanning…"
     }
 
     Text(
@@ -366,7 +437,9 @@ fun StatusChip(
         fontSize = 10.sp,
         modifier = Modifier
             .background(
-                color.copy(alpha = .12f),
+                color.copy(
+                    alpha = .12f
+                ),
                 RoundedCornerShape(4.dp)
             )
             .padding(
@@ -380,22 +453,31 @@ fun StatusChip(
 fun rememberDrawablePainter(
     drawable: Drawable
 ): androidx.compose.ui.graphics.painter.Painter {
+
     return remember(drawable) {
-        object : androidx.compose.ui.graphics.painter.Painter() {
+
+        object :
+            androidx.compose.ui.graphics.painter.Painter() {
+
             override val intrinsicSize = Size(
                 drawable.intrinsicWidth.toFloat(),
                 drawable.intrinsicHeight.toFloat()
             )
 
             override fun DrawScope.onDraw() {
+
                 drawIntoCanvas { canvas ->
+
                     drawable.setBounds(
                         0,
                         0,
                         size.width.toInt(),
                         size.height.toInt()
                     )
-                    drawable.draw(canvas.nativeCanvas)
+
+                    drawable.draw(
+                        canvas.nativeCanvas
+                    )
                 }
             }
         }
